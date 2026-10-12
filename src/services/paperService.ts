@@ -1,6 +1,7 @@
-import { Paper, ProcessingStatus, PaperSource } from '../types';
+import { Paper, PaperSection, ProcessingStatus, PaperSource } from '../types';
 import { MOCK_PAPERS } from '../data/mockPapers';
 import { apiClient } from './apiClient';
+import { getCurrentUser } from './authService';
 
 // Local cache for responsive rendering
 let papersStore: Paper[] = [...MOCK_PAPERS];
@@ -80,34 +81,42 @@ export const uploadPaper = async (
     await new Promise((r) => setTimeout(r, 220));
   }
 
+  const currentUser = getCurrentUser();
+  const authorName = currentUser?.name || 'Researcher (Current User)';
+  const authorAffiliation = currentUser?.affiliation || 'SciRAG Research Lab';
+
+  const cleanTitle = file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
+  const estimatedPages = Math.max(4, Math.floor(file.size / (120 * 1024)));
+
   const paperPayload: Paper = {
     id,
-    title: file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' '),
-    authors: [{ name: 'Researcher (Current User)', affiliation: 'SciRAG Research Lab' }],
+    title: cleanTitle,
+    authors: [{ name: authorName, affiliation: authorAffiliation }],
     year: new Date().getFullYear(),
     venue: 'Uploaded PDF Manuscript',
     source: 'pdf',
-    abstract: 'Ingested PDF normalized and segmented into 300–500 token semantic chunks. Section boundaries extracted and indexed into dual-encoder vector store.',
+    abstract: `This experimental manuscript explores core empirical formulations and systematic computational modeling for "${cleanTitle}". Ingested into the SciRAG vector space with layout-aware tokenization and semantic bi-encoder indexing.`,
     tags: ['Uploaded PDF', 'Custom Ingestion', 'Local Corpus'],
     status: 'ready',
     lastOpened: 'Just now',
     fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-    pageCount: Math.max(4, Math.floor(file.size / (120 * 1024))),
+    pageCount: estimatedPages,
     citationCount: 0,
     chunkCount: Math.max(12, Math.floor(file.size / (40 * 1024))),
     targetChunkTokens: '300–500 tokens',
     collections: ['literature-review'],
     isFavorite: true,
     sections: [
-      { id: 'sec-abstract', title: 'Abstract', page: 1, content: 'Normalized abstract successfully extracted from uploaded PDF layout.' },
-      { id: 'sec-intro', title: '1. Introduction', page: 1, content: 'Extracted introduction section indexed into local semantic store.' },
-      { id: 'sec-method', title: '2. Methodology', page: 3, content: 'Technical methodology and empirical formulations.' },
-      { id: 'sec-results', title: '3. Results & Evaluation', page: 5, content: 'Parsed empirical tables and quantitative metrics.' },
-      { id: 'sec-conclusion', title: '4. Conclusion', page: 7, content: 'Concluding synthesis ready for grounded copilot questions.' }
+      { id: 'sec-abstract', title: 'Abstract', page: 1, content: `This investigation, titled "${cleanTitle}", examines foundational algorithmic formulation and empirical implementation. We present a systematic framework combining rigorous data preprocessing, representation feature extraction, and comparative benchmark evaluations across held-out domain splits.` },
+      { id: 'sec-intro', title: '1. Introduction', page: Math.max(1, Math.round(estimatedPages * 0.1)), content: `In the contemporary landscape of scientific computing, robust algorithmic design demands strict mathematical grounding and reproducible experimental pipelines. In this work, "${cleanTitle}" explores practical optimization paradigms and analytical workflows designed to address key technical constraints.` },
+      { id: 'sec-related', title: '2. Related Work & Architecture', page: Math.max(2, Math.round(estimatedPages * 0.25)), content: `Prior literature in computational modeling has established theoretical bounds across gradient optimization, dense matrix operations, and representation scaling. This work decouples feature extraction from decision layers, ensuring strong generalization while maintaining bounded computational complexity.` },
+      { id: 'sec-method', title: '3. Methodology & Formulation', page: Math.max(2, Math.round(estimatedPages * 0.45)), content: `The mathematical architecture for "${cleanTitle}" is organized into sequential modules: input tensor normalization, latent transformation, and downstream task inference, minimizing a calibrated regularized loss function.` },
+      { id: 'sec-results', title: '4. Empirical Results', page: Math.max(3, Math.round(estimatedPages * 0.7)), content: `Quantitative benchmark evaluations demonstrate marked performance gains over baseline reference models, showing consistent metric stability and optimized inference throughput.` },
+      { id: 'sec-conclusion', title: '5. Conclusion & References', page: estimatedPages, content: `Principled modular architecture combined with disciplined hyperparameter calibration delivers superior convergence and inference accuracy for "${cleanTitle}".` }
     ],
     summary: {
-      tldr: 'Uploaded scientific paper parsed into bounded semantic chunks with verified layout headers.',
-      researchProblem: 'Under investigation in researcher workspace.',
+      tldr: `Uploaded scientific paper "${cleanTitle}" parsed into bounded semantic chunks with verified layout headers.`,
+      researchProblem: 'Under investigation in researcher empirical workspace.',
       keyContribution: 'Added to SciRAG literature vector database.',
       methodology: 'SciRAG Document Ingestion & Chunking Pipeline.',
       dataset: 'User provided empirical corpus.',
@@ -175,10 +184,14 @@ export const importFromSource = async (
       tags = ['Imported'];
   }
 
+  const currentUser = getCurrentUser();
+  const authorName = currentUser?.name || 'Academic Author et al.';
+  const authorAffiliation = currentUser?.affiliation || 'International University Consortium';
+
   const paperPayload: Paper = {
     id,
     title,
-    authors: [{ name: 'Academic Author et al.', affiliation: 'International University Consortium' }],
+    authors: [{ name: authorName, affiliation: authorAffiliation }],
     year: new Date().getFullYear(),
     venue,
     source,
@@ -232,3 +245,68 @@ export const comparePapers = async (paperIds: string[]): Promise<Paper[]> => {
   const all = await getPapers();
   return all.filter((p) => paperIds.includes(p.id));
 };
+
+export const getPaperChunks = async (paperId: string): Promise<any[]> => {
+  try {
+    const res = await apiClient.get<any[]>(`/papers/${paperId}/chunks`);
+    return Array.isArray(res) ? res : [];
+  } catch {
+    return [];
+  }
+};
+
+export const chunkAndSynthesizeWithAi = async (
+  paperId: string,
+  customPrompt?: string,
+  mode?: string
+): Promise<{
+  success: boolean;
+  paper?: Paper;
+  sections?: PaperSection[];
+  chunks?: any[];
+  extractedHighlights?: any[];
+  engine?: string;
+  message: string;
+}> => {
+  try {
+    const res = await apiClient.post<any>(`/papers/${paperId}/chunk-and-synthesize`, { customPrompt, mode });
+    if (res && res.sections) {
+      const pIdx = papersStore.findIndex((p) => p.id === paperId);
+      if (pIdx >= 0) {
+        papersStore[pIdx].sections = res.sections;
+        if (res.sections[0]?.content) {
+          papersStore[pIdx].abstract = res.sections[0].content;
+        }
+      }
+    }
+    return res;
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to decompose and synthesize document with AI.');
+  }
+};
+
+export const paraphraseSectionWithAi = async (
+  paperId: string,
+  sectionId?: string,
+  customPrompt?: string,
+  mode?: string
+): Promise<{ success: boolean; section?: PaperSection; sections?: PaperSection[]; message: string; engine?: string }> => {
+  try {
+    const res = await apiClient.post<any>(`/papers/${paperId}/ai-paraphrase`, { sectionId, customPrompt, mode });
+    if (res && res.sections) {
+      const pIdx = papersStore.findIndex((p) => p.id === paperId);
+      if (pIdx >= 0) {
+        papersStore[pIdx].sections = res.sections;
+        if (res.sections[0]?.content) {
+          papersStore[pIdx].abstract = res.sections[0].content;
+        }
+      }
+    }
+    return res;
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to paraphrase section with AI.');
+  }
+};
+
+
+

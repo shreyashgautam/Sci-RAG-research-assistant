@@ -21,6 +21,17 @@ export interface PaperSection {
   content: string;
 }
 
+export interface PaperChunk {
+  id: string;
+  chunkIndex: number;
+  section: string;
+  page: number;
+  text: string;
+  tokens: number;
+  keyPhrases?: string[];
+  extractedSalientText?: string;
+}
+
 export interface Paper {
   id: string;
   title: string;

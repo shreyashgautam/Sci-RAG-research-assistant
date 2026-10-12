@@ -75,9 +75,12 @@ export const LoginPage: React.FC = () => {
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
               <div className="flex-1">
                 <p className="font-medium">{error}</p>
-                {error.includes('registered') && (
-                  <Link to="/register" className="underline font-semibold mt-1 inline-block">
-                    Click here to create a new account
+                {error.toLowerCase().includes('register') && (
+                  <Link
+                    to={email ? `/register?email=${encodeURIComponent(email)}` : '/register'}
+                    className="underline font-semibold mt-1 inline-block text-neutral-900 dark:text-neutral-100"
+                  >
+                    Click here to create an account {email ? `for ${email}` : 'now'}
                   </Link>
                 )}
               </div>
@@ -151,10 +154,13 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-neutral-100 dark:border-neutral-800 text-center space-y-3">
-            <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200/70 dark:border-neutral-800 text-[11px] text-neutral-500 flex items-center justify-between">
+          <div className="mt-6 pt-5 border-t border-neutral-100 dark:border-neutral-800 space-y-2.5">
+            <div className="text-[11px] text-neutral-500 font-medium mb-1">
+              Quick Fill Registered Accounts:
+            </div>
+            <div className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200/70 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
               <span className="truncate pr-1">
-                Researcher: <span className="font-mono text-neutral-800 dark:text-neutral-200 font-medium">shreyashgautam2007@gmail.com</span>
+                <span className="font-mono text-neutral-900 dark:text-neutral-100 font-medium">shreyashgautam2007@gmail.com</span>
               </span>
               <button
                 type="button"
@@ -169,10 +175,27 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-xs text-neutral-500">
+            <div className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200/70 dark:border-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
+              <span className="truncate pr-1">
+                <span className="font-mono text-neutral-900 dark:text-neutral-100 font-medium">e.rostova@scirag.io</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('e.rostova@scirag.io');
+                  setPassword('password123');
+                  setError(null);
+                }}
+                className="text-neutral-900 dark:text-neutral-100 font-semibold hover:underline cursor-pointer shrink-0 ml-2"
+              >
+                Fill Credentials
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-500 text-center pt-2">
               Don't have a research account?{' '}
               <Link
-                to="/register"
+                to={email ? `/register?email=${encodeURIComponent(email)}` : '/register'}
                 className="font-semibold text-neutral-900 dark:text-neutral-100 hover:underline"
               >
                 Register here
